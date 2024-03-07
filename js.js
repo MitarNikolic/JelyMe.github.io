@@ -22,26 +22,30 @@ const debounce = (fn) => {
   let frame;
 
   return (...params) => {
-    if (frame) { 
+    if (frame) {
       cancelAnimationFrame(frame);
     }
 
     frame = requestAnimationFrame(() => {
       fn(...params);
     });
-
-  } 
+  };
 };
 
 //MODIFIED BORROWED CODE
-const searchResults = document.querySelector('.search-results')
+const searchResults = document.querySelector(".search-results");
 
 const storeScroll = () => {
-  var scrollamount = (searchResults.scrollTop/searchResults.scrollHeight);
-  searchResults.style.setProperty("--scroll-amount", interpolate("#4287f5","#460c85", scrollamount));
-}
+  var scrollamount = searchResults.scrollTop / searchResults.scrollHeight;
+  searchResults.style.setProperty(
+    "--scroll-amount",
+    interpolate("#4287f5", "#460c85", scrollamount)
+  );
+};
 
-searchResults.addEventListener('scroll', debounce(storeScroll), { passive: true });
+searchResults.addEventListener("scroll", debounce(storeScroll), {
+  passive: true,
+});
 
 storeScroll();
 //END BORROWED CODE
@@ -54,102 +58,123 @@ var subjectList = null;
 
 //open("https://raw.githubusercontent.com/JelyMe/NCEAPapers/main/exams/90837-2021.pdf")
 
-fetch("subjects.json").then((res) =>{return res.json()}).then((data)=>{
-  subjectList = data;
-})
+fetch("subjects.json")
+  .then((res) => {
+    return res.json();
+  })
+  .then((data) => {
+    subjectList = data;
+  });
 
+fetch("searchIndex.json")
+  .then((res) => res.json())
+  .then((data) => {
+    idx = lunr(function () {
+      this.ref("id");
+      this.field("title");
+      this.field("subject");
+      this.field("number");
 
-document.querySelector('#search-text').addEventListener('keyup', (event) => {
-  const searchText = document.querySelector('#search-text');
-  const autocomplete = document.querySelector('#autocomplete');
+      data.forEach(function (doc) {
+        this.add(doc);
+      }, this);
+    });
+    fullData = data;
+    console.log("Fetch Completed");
+  });
+
+document.querySelector("#search-text").addEventListener("keyup", (event) => {
+  const searchText = document.querySelector("#search-text");
+  const autocomplete = document.querySelector("#autocomplete");
   const loadingWheel = document.querySelector(".loading-wheel");
-  
-  if (event.keyCode == 13) { //Enter key
-    if (searchText.value == autocomplete.innerHTML) {
 
+  if (event.keyCode == 13) {
+    //Enter key
+    if (searchText.value == autocomplete.innerHTML) {
       console.log("Enter");
       searchResults.style.display = "none";
       console.log("Search Results Hidden");
       loadingWheel.style.display = "flex";
       console.log("Loading Wheel displayed");
-      
-      fetch("searchIndex.json").then((res) => { return res.json()}).then((data) => {
-          
-        idx = lunr(function () {
-          this.ref('id');
-          this.field('title');
-          this.field('subject');
-          this.field('number');
-            
-          data.forEach(function (doc) {
-            this.add(doc)
-          }, this)
-        })
-          
-        fullData = data;
+      searchResults.innerHTML = "";
 
-        console.log("Completed");
-
-        searchResults.innerHTML = "";
-
-        idx.search(searchText.value).forEach((result) => {
-          searchResults.innerHTML += 
-          `<div class="search-results-card flex-c-c">
-            <div class="standard-info flex-c-s flex-column">
-              <div class="standard-info-numbers flex-se-c">
-                <h1 class="standard-info-id inter-light">
-                  `+fullData[result.ref]["number"]+`
+      new Promise((resolve) =>
+        setTimeout(() => {
+          let inner = "";
+          idx.search(searchText.value).forEach((result) => {
+            inner +=
+              `<div class="search-results-card flex-c-c">
+              <div class="standard-info flex-c-s flex-column">
+                <div class="standard-info-numbers flex-se-c">
+                  <h1 class="standard-info-id inter-light">
+                    ` +
+              fullData[result.ref]["number"] +
+              `
+                  </h1>
+                  <h4 class="standard-info-time-period inter-light">
+                  ` +
+              fullData[result.ref]["year-range"] +
+              `
+                  </h4>
+                </div>
+                <div class="standard-info-description inconsolata">
+                  <p>` +
+              fullData[result.ref]["title"] +
+              ` | Credits: ` +
+              fullData[result.ref]["credits"] +
+              `</p>
+                </div>
+              </div>
+        
+              <div class="split-bar"></div>
+        
+              <div class="standard-credits">
+                <h1 class="standard-credits-text inter-light">
+                  ` +
+              fullData[result.ref]["level"] +
+              `
                 </h1>
-                <h4 class="standard-info-time-period inter-light">
-                `+fullData[result.ref]["year-range"]+`
-                </h4>
               </div>
-              <div class="standard-info-description inconsolata">
-                <p>`+fullData[result.ref]["title"]+` | Credits: `+fullData[result.ref]["credits"]+`</p>
-              </div>
-            </div>
+        
+              <button class="download-plus" onclick="window.open('https://raw.githubusercontent.com/JelyMe/NCEAPapers/main/zipped/` +
+              fullData[result.ref]["number"] +
+              `.zip')"></button>
       
-            <div class="split-bar"></div>
-      
-            <div class="standard-credits">
-              <h1 class="standard-credits-text inter-light">
-                `+fullData[result.ref]["level"]+`
-              </h1>
-            </div>
-      
-            <button class="download-plus" onclick="window.open('https://raw.githubusercontent.com/JelyMe/NCEAPapers/main/zipped/` + fullData[result.ref]["number"] + `.zip')"></button>
-    
-          </div>`
-        });
-          
+            </div>`;
+          });
+          resolve(inner);
+        }, 5)
+      ).then((inner) => {
+        //Success
         console.log("Out");
-        loadingWheel.style.display = "none";
-        console.log("Loading wheel hidden");
+        searchResults.innerHTML = inner;
         searchResults.style.display = "flex";
         console.log("Search results shown");
+        loadingWheel.style.display = "none";
+        console.log("Loading wheel hidden");
       });
-    }
-    else {
+    } else {
       searchText.value = autocomplete.innerHTML;
     }
   }
 
   autocomplete.innerHTML = searchText.value;
 
-  if (searchText.value.length != 0)
-  {
+  if (searchText.value.length != 0) {
     for (let index = 0; index < subjectList.length; index++) {
       const subject = subjectList[index];
 
-      if (subject.toLowerCase().substr(0,searchText.value.length) == searchText.value.toLowerCase()) {
+      if (
+        subject.toLowerCase().substr(0, searchText.value.length) ==
+        searchText.value.toLowerCase()
+      ) {
         autocomplete.innerHTML = subject;
-        searchText.value = subject.substr(0,searchText.value.length);
+        searchText.value = subject.substr(0, searchText.value.length);
 
         break;
       }
     }
-  }
-  else {
+  } else {
     autocomplete.innerHTML = "Search";
   }
 });
